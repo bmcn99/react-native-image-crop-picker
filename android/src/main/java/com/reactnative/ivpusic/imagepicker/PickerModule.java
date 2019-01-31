@@ -8,6 +8,11 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.PorterDuff.Mode;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Build;
@@ -16,6 +21,7 @@ import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.FileProvider;
 import android.util.Base64;
+import android.util.Config;
 import android.webkit.MimeTypeMap;
 import android.content.ContentResolver;
 
@@ -31,12 +37,13 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableNativeMap;
 import com.facebook.react.modules.core.PermissionAwareActivity;
 import com.facebook.react.modules.core.PermissionListener;
-import com.bmcn99.ucrop.UCrop;
-import com.bmcn99.ucrop.UCropActivity;
+import com.yalantis.ucrop.UCrop;
+import com.yalantis.ucrop.UCropActivity;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -727,6 +734,22 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
                     WritableMap result = getSelection(activity, resultUri, false);
 
                     if (result != null) {
+
+                        Bitmap bitmap = MediaStore.Images.Media.getBitmap(activity.getContentResolver(), resultUri);
+                        Bitmap circleCroppedBitmap = getCroppedBitmap(bitmap);
+
+                        // String path = resultUri.uri.getPath(); // "/mnt/sdcard/FileName.mp3"
+                        String path = resultUri.getPath();
+                        File file = new File(path);
+
+                        try {
+                            FileOutputStream out = new FileOutputStream(file);
+                            circleCroppedBitmap.compress(Bitmap.CompressFormat.PNG, 100, out); // bmp is your Bitmap instance
+                            // PNG is a lossless format, the compression factor (100) is ignored
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+
                         result.putMap("cropRect", PickerModule.getCroppedRectMap(data));
 
                         resultCollector.setWaitCount(1);
@@ -743,6 +766,28 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
         } else {
             resultCollector.notifyProblem(E_PICKER_CANCELLED_KEY, E_PICKER_CANCELLED_MSG);
         }
+    }
+
+    private Bitmap getCroppedBitmap(Bitmap bitmap) {
+        Bitmap output = Bitmap.createBitmap(bitmap.getWidth(),
+                bitmap.getHeight(), Bitmap.Config.ARGB_8888);//Bitmap.Config.RGB_565
+        Canvas canvas = new Canvas(output);
+    
+        final int color = 0xff424242;
+        final Paint paint = new Paint();
+        final Rect rect = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
+    
+        paint.setAntiAlias(true);
+        canvas.drawARGB(0, 0, 0, 0);
+        paint.setColor(color);
+        // canvas.drawRoundRect(rectF, roundPx, roundPx, paint);
+        canvas.drawCircle(bitmap.getWidth() / 2, bitmap.getHeight() / 2,
+                bitmap.getWidth() / 2, paint);
+        paint.setXfermode(new PorterDuffXfermode(Mode.SRC_IN));
+        canvas.drawBitmap(bitmap, rect, rect, paint);
+        //Bitmap _bmp = Bitmap.createScaledBitmap(output, 60, 60, false);
+        //return _bmp;
+        return output;
     }
 
     @Override
